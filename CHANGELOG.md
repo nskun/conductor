@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/microsoft/conductor/compare/v0.1.33...HEAD)
 
+### Added
+
+- **Workflow-level debug file logging via `runtime.log_file`** — workflow YAML
+  can now select `auto` or an explicit log path for both `conductor run` and
+  `conductor resume`; an explicit `--log-file` option takes precedence.
+
 ### Fixed
 
 - **MCP tool discovery and structured tool results no longer break with MCP

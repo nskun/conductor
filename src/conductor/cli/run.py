@@ -113,6 +113,26 @@ def generate_log_path(workflow_name: str) -> Path:
     return path
 
 
+def resolve_log_file(value: str, stem: str) -> Path | None:
+    """Resolve a raw ``runtime.log_file`` value to a concrete Path.
+
+    Returns None and prints a warning if the value cannot be resolved.
+    """
+    try:
+        if value.strip().lower() == "auto":
+            return generate_log_path(stem)
+        return Path(value).expanduser()
+    except (OSError, ValueError) as e:
+        _verbose_console.print(
+            styled(
+                "[bold yellow]Warning:[/bold yellow] Cannot prepare log file {}: {}",
+                value,
+                e,
+            )
+        )
+        return None
+
+
 def init_file_logging(log_path: Path) -> None:
     """Initialize file logging to the given path.
 
@@ -146,7 +166,7 @@ def _try_init_file_logging(log_path: Path | None) -> bool:
 
     try:
         init_file_logging(log_path)
-    except OSError as e:
+    except (OSError, ValueError) as e:
         _verbose_console.print(
             styled("[bold yellow]Warning:[/bold yellow] Cannot open log file {}: {}", log_path, e)
         )
@@ -2006,11 +2026,9 @@ async def run_workflow_async(
         if log_file is None:
             configured = config.workflow.runtime.log_file
             if configured is not None:
-                if configured.lower() == "auto":
-                    log_file = generate_log_path(workflow_path.stem)
-                else:
-                    log_file = Path(configured)
-                _try_init_file_logging(log_file)
+                log_file = resolve_log_file(configured, workflow_path.stem)
+                if log_file is not None and not _try_init_file_logging(log_file):
+                    log_file = None
 
         # Merge CLI metadata on top of YAML-declared metadata
         if metadata:
@@ -2671,11 +2689,9 @@ async def resume_workflow_async(
         if log_file is None:
             configured = config.workflow.runtime.log_file
             if configured is not None:
-                if configured.lower() == "auto":
-                    log_file = generate_log_path(resolved_workflow_path.stem)
-                else:
-                    log_file = Path(configured)
-                _try_init_file_logging(log_file)
+                log_file = resolve_log_file(configured, resolved_workflow_path.stem)
+                if log_file is not None and not _try_init_file_logging(log_file):
+                    log_file = None
 
         # Merge CLI metadata on top of YAML-declared metadata (parity with run)
         if metadata:

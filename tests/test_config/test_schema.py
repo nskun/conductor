@@ -697,6 +697,14 @@ class TestRuntimeConfig:
         serialized = RuntimeConfig().model_dump(exclude_none=True)
         assert "log_file" not in serialized
 
+    def test_log_file_rejects_empty_and_whitespace(self) -> None:
+        """Empty or whitespace-only log_file is rejected at the schema level."""
+        with pytest.raises(ValidationError):
+            RuntimeConfig(log_file="")
+
+        with pytest.raises(ValidationError):
+            RuntimeConfig(log_file="   ")
+
     def test_custom_provider(self) -> None:
         """Test custom provider setting."""
         config = RuntimeConfig(provider="openai-agents", default_model="gpt-4")

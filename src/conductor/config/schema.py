@@ -3332,8 +3332,11 @@ class RuntimeConfig(BaseModel):
     default_model: str | None = None
     """Default model for agents that don't specify one."""
 
-    log_file: str | None = None
-    """Default log file path, or ``auto`` to generate one automatically."""
+    log_file: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = None
+    """Default log file path, or ``auto`` (case-insensitive) to generate one automatically.
+
+    Honoured only for the top-level workflow; ignored in a ``type: workflow`` sub-workflow.
+    """
 
     mcp_servers: dict[str, MCPServerDef] = Field(default_factory=dict)
     """MCP server configurations keyed by server name."""

@@ -615,10 +615,10 @@ def run(
         InputCollector,
         build_dry_run_plan,
         display_execution_plan,
-        generate_log_path,
         parse_input_flags,
         parse_input_json_flags,
         parse_metadata_flags,
+        resolve_log_file,
         run_workflow_async,
     )
 
@@ -660,10 +660,7 @@ def run(
     # Resolve log file path
     resolved_log_file: Path | None = None
     if log_file is not None:
-        if log_file.lower() == "auto":
-            resolved_log_file = generate_log_path(workflow_path.stem)
-        else:
-            resolved_log_file = Path(log_file)
+        resolved_log_file = resolve_log_file(log_file, workflow_path.stem)
 
     # Handle --web-bg: fork a background process and exit immediately
     if web_bg:
@@ -1081,9 +1078,9 @@ def resume(
     import json
 
     from conductor.cli.run import (
-        generate_log_path,
         parse_guidance_flags,
         parse_metadata_flags,
+        resolve_log_file,
         resume_workflow_async,
     )
 
@@ -1154,11 +1151,8 @@ def resume(
     # Resolve log file path
     resolved_log_file: Path | None = None
     if log_file is not None:
-        if log_file.lower() == "auto":
-            name = resolved_workflow.stem if resolved_workflow else "resume"
-            resolved_log_file = generate_log_path(name)
-        else:
-            resolved_log_file = Path(log_file)
+        name = resolved_workflow.stem if resolved_workflow else "resume"
+        resolved_log_file = resolve_log_file(log_file, name)
 
     # Handle --web-bg: fork a background process and exit immediately
     if web_bg:

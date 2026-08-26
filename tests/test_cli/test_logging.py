@@ -435,16 +435,18 @@ class TestTryInitFileLogging:
         import os
         from io import StringIO
 
-        from rich.console import Console
-
-        from conductor.cli.run import _try_init_file_logging, close_file_logging
+        from conductor.cli.run import (
+            _SilentAwareConsole,
+            _try_init_file_logging,
+            close_file_logging,
+        )
 
         readonly_dir = tmp_path / "readonly"
         readonly_dir.mkdir()
         os.chmod(readonly_dir, 0o444)
 
         stderr_output = StringIO()
-        mock_console = Console(file=stderr_output, no_color=True, highlight=False)
+        mock_console = _SilentAwareConsole(file=stderr_output, no_color=True, highlight=False)
 
         try:
             with patch("conductor.cli.run._verbose_console", mock_console):
@@ -1733,6 +1735,54 @@ output:
         ):
             return asyncio.run(run_workflow_async(workflow_file, {}, log_file=log_file))
 
+    def test_yaml_log_file_auto(self, tmp_path: Path) -> None:
+        """Ensure log_file: auto creates a timestamped file under $TMPDIR/conductor/."""
+        import asyncio
+        import tempfile
+        from unittest.mock import AsyncMock, MagicMock
+
+        from conductor.cli.run import run_workflow_async
+
+        workflow_file = tmp_path / "test.yaml"
+        workflow_file.write_text(
+            """\
+workflow:
+  name: test-workflow
+  entry_point: agent1
+  runtime:
+    log_file: auto
+
+agents:
+  - name: agent1
+    prompt: "Hello"
+    routes:
+      - to: $end
+
+output:
+  result: "done"
+""",
+            encoding="utf-8",
+        )
+
+        mock_registry = AsyncMock()
+        mock_registry.__aenter__ = AsyncMock(return_value=mock_registry)
+        mock_registry.__aexit__ = AsyncMock(return_value=False)
+
+        mock_engine = MagicMock()
+        mock_engine.run = AsyncMock(return_value={"result": "done"})
+
+        with (
+            patch("conductor.cli.run.ProviderRegistry", return_value=mock_registry),
+            patch("conductor.cli.run.WorkflowEngine", return_value=mock_engine),
+        ):
+            asyncio.run(run_workflow_async(workflow_file, {}, log_file=None))
+
+        conductor_dir = Path(tempfile.gettempdir()) / "conductor"
+        log_files = list(conductor_dir.glob("conductor-test-*.log"))
+        assert len(log_files) == 1
+        content = log_files[0].read_text(encoding="utf-8")
+        assert len(content) > 0
+
     def test_yaml_log_file_explicit_path(self, tmp_path: Path) -> None:
         """Use runtime.log_file when the CLI option is unset."""
         from io import StringIO
@@ -1754,6 +1804,8 @@ output:
 
         assert result == {"result": "done"}
         assert log_path.exists()
+        content = log_path.read_text(encoding="utf-8")
+        assert len(content) > 0
         assert "Log written to" in stderr_output.getvalue()
         assert str(log_path) in stderr_output.getvalue()
 
@@ -1837,6 +1889,8 @@ output:
 
         assert result == {"result": "done"}
         assert log_path.exists()
+        content = log_path.read_text(encoding="utf-8")
+        assert len(content) > 0
 
 
 class TestFileLoggingStderrNotification:
