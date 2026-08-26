@@ -1,9 +1,9 @@
 """JSONL event log subscriber for structured workflow diagnostics.
 
-Subscribes to the ``WorkflowEventEmitter`` and writes every event as a
-JSON line to a file in ``$TMPDIR/conductor/``.  The log file is always
-created — no CLI flag required — so diagnostic data is available for
-every run.
+Subscribes to the ``WorkflowEventEmitter`` and writes every event as a JSON
+line. A newly created log is placed in ``$TMPDIR/conductor/`` (or a directory
+specified by ``runtime.event_log_dir``). The log file is always created — no
+CLI flag required — so diagnostic data is available for every run.
 
 Example::
 
@@ -95,6 +95,13 @@ class EventLogSubscriber:
             existing_run_id: The run identifier associated with
                 ``existing_path``. Reused (not regenerated) so log /
                 timeline correlation tools see one continuous run.
+            event_log_dir: Preferred base directory for a freshly created
+                log, replacing the default ``$TMPDIR/conductor/`` when it is
+                usable. An OS error while creating or opening the log falls
+                back to the default. This value is ignored when the
+                ``existing_path`` append branch is taken, so a resumed run
+                keeps writing to the log its checkpoint points at. Callers
+                resolve relative paths and ``~`` before passing a value here.
 
         When neither ``existing_path`` nor ``existing_run_id`` is
         provided, the run id is taken from the ``CONDUCTOR_RUN_ID``
@@ -151,14 +158,25 @@ class EventLogSubscriber:
                 )
             self._run_id = new_run_id()
         ts = time.strftime("%Y%m%d-%H%M%S")
-        base_dir = (
-            event_log_dir
-            if event_log_dir is not None
-            else Path(tempfile.gettempdir()) / "conductor"
-        )
-        self._path = base_dir / f"conductor-{workflow_name}-{ts}-{self._run_id}.events.jsonl"
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._handle = open(self._path, "w", encoding="utf-8")  # noqa: SIM115
+        default_dir = Path(tempfile.gettempdir()) / "conductor"
+        base_dir = event_log_dir or default_dir
+        filename = f"conductor-{workflow_name}-{ts}-{self._run_id}.events.jsonl"
+        self._path = base_dir / filename
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            self._handle = open(self._path, "w", encoding="utf-8")  # noqa: SIM115
+        except OSError as exc:
+            if event_log_dir is None:
+                raise
+            logger.warning(
+                "Cannot use event_log_dir %s: %s; falling back to %s",
+                base_dir,
+                exc,
+                default_dir,
+            )
+            self._path = default_dir / filename
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            self._handle = open(self._path, "w", encoding="utf-8")  # noqa: SIM115
 
     @property
     def run_id(self) -> str:

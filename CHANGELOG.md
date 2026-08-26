@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/microsoft/conductor/compare/v0.1.33...HEAD)
 
+### Added
+
+- `runtime.event_log_dir` lets a top-level workflow choose where newly created
+  event JSONL logs are written. Relative paths resolve against the workflow
+  file's directory and `~` is expanded. Logs stored outside
+  `$TMPDIR/conductor/` remain visible in live Fleet Runs, but are not scanned
+  into Fleet History or pruned by Fleet retention and must be managed manually.
+
 ### Fixed
 
 - **MCP tool discovery and structured tool results no longer break with MCP

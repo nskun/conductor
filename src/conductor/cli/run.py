@@ -117,14 +117,19 @@ def _resolve_event_log_dir(
     event_log_dir: str | None,
     workflow_path: Path,
 ) -> Path | None:
-    """Resolve an event-log directory relative to its workflow file."""
+    """Resolve a configured event-log directory for a workflow.
+
+    Expand ``~``, anchor relative values to the resolved workflow file's
+    parent, and normalize lexically so the configured directory's symlink
+    spelling is preserved.
+    """
     if not event_log_dir:
         return None
 
-    path = Path(event_log_dir)
-    if not path.is_absolute():
-        path = workflow_path.resolve().parent / path
-    return path.resolve()
+    candidate = Path(event_log_dir).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path(workflow_path).resolve().parent / candidate
+    return Path(os.path.normpath(candidate))
 
 
 def init_file_logging(log_path: Path) -> None:

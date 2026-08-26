@@ -3453,14 +3453,38 @@ class RuntimeConfig(BaseModel):
     """
 
     event_log_dir: str | None = None
-    """Directory for event log output.
+    """Directory for newly created event JSONL logs.
 
-    When set, event logs are written to this directory instead of
-    ``$TMPDIR/conductor/``. Relative paths are resolved against the
-    workflow file's directory.
+    For a top-level workflow, this setting changes the base directory from
+    ``$TMPDIR/conductor/``. Relative paths are resolved against the top-level
+    workflow file's directory, and ``~`` is expanded. If creating or opening
+    a fresh log there raises an OS error, Conductor warns and falls back to
+    ``$TMPDIR/conductor/``.
 
-    When omitted, behavior is unchanged (writes to ``$TMPDIR/conductor/``).
+    A ``type: workflow`` child writes events through the top-level workflow's
+    subscriber; the child's own ``runtime.event_log_dir`` is not consulted.
+
+    On resume, a checkpoint's existing event log takes precedence when the
+    checkpoint has a run ID and the file can be opened for append. Otherwise,
+    this setting applies to the newly created log.
+
+    Logs stored outside ``$TMPDIR/conductor/`` remain visible while live in
+    Fleet Runs through their run record, but are not scanned into
+    ``conductor fleet`` History or pruned by Fleet retention. For
+    ``--web-bg``, stderr/stdout capture logs remain under
+    ``$TMPDIR/conductor/``. The shared run ID and event metadata are preserved,
+    but ``conductor status --json`` does not locate those capture files from a
+    custom event-log directory, and Fleet retention does not manage them as
+    companions of the custom event log.
     """
+
+    @field_validator("event_log_dir")
+    @classmethod
+    def _normalize_event_log_dir(cls, v: str | None) -> str | None:
+        """Normalize an empty or whitespace-only value to ``None``."""
+        if v is None:
+            return None
+        return v.strip() or None
 
     skills: list[str] = Field(default_factory=list)
     """Workflow-wide default skills for every provider-backed agent.

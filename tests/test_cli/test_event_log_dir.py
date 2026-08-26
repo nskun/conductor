@@ -62,7 +62,33 @@ def test_absolute_event_log_dir_is_unchanged(
 
     absolute_dir = tmp_path / "absolute-logs"
 
-    assert _resolve_event_log_dir(str(absolute_dir), workflow_path) == absolute_dir.resolve()
+    assert _resolve_event_log_dir(str(absolute_dir), workflow_path) == absolute_dir
+
+
+def test_absolute_event_log_dir_is_not_resolved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Absolute configured paths are normalized without following symlinks."""
+    workflow_path = tmp_path / "workflow.yaml"
+    absolute_dir = tmp_path / "symlink-alias"
+
+    def fail_resolve(_path: Path, _strict: bool = False) -> Path:
+        pytest.fail("Path.resolve() must not be called for an absolute event_log_dir")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "resolve", fail_resolve)
+        result = _resolve_event_log_dir(str(absolute_dir), workflow_path)
+
+    assert result == absolute_dir
+
+
+def test_event_log_dir_expands_user_home(tmp_path: Path) -> None:
+    """A leading tilde is expanded before the configured path is returned."""
+    result = _resolve_event_log_dir("~/conductor-logs", tmp_path / "workflow.yaml")
+
+    assert result == Path.home() / "conductor-logs"
+    assert "~" not in str(result)
 
 
 @pytest.mark.parametrize("value", [None, ""])
